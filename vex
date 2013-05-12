@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# vex: switch to and from external displays
+
+# eval set -- $(getopt -o "-d:" -- "$@")
+
+# while true; do
+# 	case "$1" in
+# 	-d ) DEV="$2"; shift 2 ;;
+# 	-- ) shift; break ;;
+# 	* ) break ;;
+# 	esac
+# done
+
+## xrandr names
+IN="LVDS1"
+VGA="VGA1"
+HDMI="HDMI1"
+
+# if [[ $DEV == "vga" ]]; then
+# 	DEV=$VGA
+# else
+# 	if [[ $DEV == "hdmi" ]]; then
+# 		DEV=$HDMI
+# 	else
+# 		DEV=""
+# 	fi
+# fi
+
+swap() {
+	local d1=$1; shift
+	local d2=$1; shift
+	xrandr --output ${d1} --off --output ${d2} --auto $* >&2
+}
+
+toggle() {
+	if (xrandr | grep "$1" | grep "+" >/dev/null); then
+		## connected and active
+		swap $1 $IN
+		return
+	else
+		if (xrandr | grep "$1" | grep " connected" >/dev/null); then
+			## connected but not active
+			swap $IN $1
+			return
+		fi
+	fi
+
+	echo "vex: $1 disconnected"
+	return 1
+}
+
+# [[ -n "$DEV" ]] && toggle "$DEV"
+
+toggle $VGA
