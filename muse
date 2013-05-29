@@ -1,0 +1,80 @@
+#!/bin/bash
+
+## muse: rsync wrapper for facilitating a 2-way sync
+
+# XXX: --size-only is bad when there is a newer file
+#      on the remote machine
+# XXX: --times can be problematic syncing over different
+#      filesystems
+
+eval set -- $(getopt -o "-lr:" --long "local:,remote:" -- "$@")
+
+while true; do
+	case "$1" in
+	-l | --local ) LOCAL=$(readlink -f "$2"); shift 2 ;;
+	-r | --remote ) REMOTE="$2"; shift 2 ;;
+	-- ) shift; break ;;
+	* ) break ;;
+	esac
+done
+
+HOST=$1
+SRC="$LOCAL/."
+DEST="$HOST:$REMOTE/."
+
+#RSYNCFLAGS="-rlp --size-only --delete --update"
+RSYNCFLAGS="--archive --delete --update"
+
+ALL_OFF="$(tput sgr0)"
+BOLD="$(tput bold)"
+BLUE="${BOLD}$(tput setaf 4)"
+
+confirm() {
+	local -l reply
+	local msg=${1:-Continue?}
+
+	[[ ! -t 0 ]] && exec </dev/tty
+	read -p "${BLUE}::${ALL_OFF} ${BOLD}$msg${ALL_OFF} [Y/n] " reply >/dev/tty
+	[[ -z $reply || $reply = y?(es) ]]
+}
+
+mklog() {
+	logdir=$(mktemp --tmpdir=/tmp -d muse-XXXXXXX) || return 1
+	log1="$logdir/put.log"
+	log2="$logdir/get.log"
+}
+
+rmlog() {
+	rm -rf $logdir
+}
+
+twoway() {
+	if [[ -d $logdir ]]; then
+		rsync $RSYNCFLAGS $@ $SRC $DEST > $log1 || return 1
+		rsync $RSYNCFLAGS $@ $DEST $SRC > $log2 || return 1
+	else
+		rsync $RSYNCFLAGS $@ $SRC $DEST
+		rsync $RSYNCFLAGS $@ $DEST $SRC
+	fi
+}
+
+## main
+if [[ -z "$LOCAL" || -z "$REMOTE" || -z "$HOST" ]]; then
+	printf "%s\n" "usage: muse -l <local> -r <remote> <remotehost>"
+	exit
+else
+	if ! mklog; then
+		printf "%s\n" "muse: log creation failed"
+		exit 1
+	fi
+
+	if twoway -nvihh; then
+		confirm "View dryrun logs?" && vimdiff $log{1,2}
+		rmlog
+		confirm "Perform rsync?" && twoway
+	else
+		rmlog
+		printf "%s\n" "muse: rsync failed"
+		exit 1
+	fi
+fi
