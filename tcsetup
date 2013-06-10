@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# tcsetup: toggle mount ntfs truecrypt volume.
+
+err() {
+	local mesg=$1; shift
+	printf "tcsetup: ${mesg}\n" "$*" >&2
+	exit 1
+}
+
+usage() {
+	printf "usage: %s\n" "tcsetup <cryptsrc> <directory>"
+	exit 1
+}
+
+if [[ $# -ne 2 ]]; then
+	usage
+else
+	if [[ -z $SUDO_USER ]]; then
+		err "only sudoers can do that"
+	else
+		cryptpath="$1"
+		mountpt="$2"
+
+		cryptdev=${cryptpath##*/}
+		mountopts="-o defaults,dmask=022,fmask=133,uid=$SUDO_UID,gid=$SUDO_GID"
+	fi
+fi
+
+if mountpoint --quiet $mountpt; then
+	loopdev=$(awk -v dev=$cryptdev -F":" '/dev/ {print $1}' <(losetup -a))
+
+	umount "$mountpt"           || err "umount $mountpt failed"
+	# XXX: umount exits but the device is busy so an immediate `dmsetup remove`
+	# will fail unless the sleep is here.
+	sleep 1
+	dmsetup remove "$cryptdev"  || err "remove $cryptdev failed"
+	losetup --detach "$loopdev" || err "detach $loopdev failed"
+else
+	loopdev=$(losetup -f)
+
+	losetup "$loopdev" "$cryptpath" || err "losetup failed"
+	tcplay --map="$cryptdev" --device="$loopdev" \
+		|| (losetup -d "$loopdev" && err "map $cryptdev failed")
+	mount $mountopts "/dev/mapper/$cryptdev" "$mountpt" \
+		|| err "mount $mountpt failed"
+fi
