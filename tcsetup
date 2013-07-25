@@ -4,7 +4,7 @@
 
 err() {
 	local mesg=$1; shift
-	printf "tcsetup: ${mesg}\n" "$*" >&2
+	printf "tcsetup: %s\n" "${mesg}" >&2
 	exit 1
 }
 

@@ -13,11 +13,11 @@ BLUE="${BOLD}$(tput setaf 4)"
 YELLOW="${BOLD}$(tput setaf 3)"
 
 msg() {
-	printf "${BLUE}+${ALL_OFF} %s\n" "$@" >&2
+	printf "%s %s\n" "${BLUE}+${ALL_OFF}" "$@" >&2
 }
 
 msg2() {
-	printf "${YELLOW}!${ALL_OFF} %s!\n" "$@" >&2
+	printf "%s %s!\n" "${YELLOW}!${ALL_OFF}" "$@" >&2
 }
 
 if [[ -z $TERMINFO ]]; then
