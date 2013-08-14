@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# docx2txt: http://woozle.org/~neale/papers/docx.html
+
+if [[ $(which -a docx2txt.pl) =~ "/usr/bin/docx2txt.pl" ]]; then
+	/usr/bin/docx2txt.pl < "$@"
+else
+	unzip -qc "$1" word/document.xml | sed 's#</w:p>#\n\n#g;s#<[^>]*>##g'
+fi
