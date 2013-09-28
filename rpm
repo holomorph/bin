@@ -1,7 +1,5 @@
 #!/bin/bash
 
-FLAGS="$*"
+cd "$HOME/.local/share/pkgbuild"
 
-cd "$HOME/bin/pkgbuild"
-
-[[ -f rebuild ]] && ./rebuild $FLAGS
+[[ -f rebuild ]] && ./rebuild "$*"
