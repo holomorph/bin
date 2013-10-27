@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# xls2txt: wrapper for xls2csv and xlsx2csv to format Excel spreadsheets into
+#          plaintext tables
+
+CHAR=""
+
+case "$1" in
+	*.xlsx)
+		read -r -d '' XLS <<EOF
+s/^,*$//g
+s/^"//g
+s/"$//g
+s/,,/,"",/g
+s/","/$CHAR /g
+EOF
+		xlsx2csv "$1" | sed -e "${XLSX}" | column -ts"$CHAR"
+		;;
+	*)
+		read -r -d '' XLSX <<EOF
+s/^,*$//g
+s/^"//g
+s/",$//g
+s/","/$CHAR /g
+EOF
+		xls2csv "$1" | sed -e "${XLS}" | column -ts"$CHAR"
+		;;
+esac
