@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# A simple wrapper around livestreamer
+
+flags=(
+    -Q -p 'mpv --cache 4096'
+    --twitch-legacy-names
+    --stream-sorting-excludes '>=720p,>=720p+'
+    --ringbuffer-size 800000
+    "$1" "${2:-best,source,mobile_source}"
+)
+
+exec livestreamer "${flags[@]}"
