@@ -16,12 +16,11 @@ toggle() {
 	local display="$(grep "^$1" <<< "$xrandr")"
 	local internal="LVDS1"
 
-	## active
 	if [[ "$display" =~ "+" ]]; then
+		## display active
 		swap "$1" "$internal" && return
-	fi
-	## not active
-	if [[ "$display" =~ " connected" ]]; then
+	else
+		## display not active
 		swap "$internal" "$1" && return
 	fi
 
