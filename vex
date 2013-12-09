@@ -2,54 +2,37 @@
 
 # vex: switch to and from external displays
 
-# eval set -- $(getopt -o "-d:" -- "$@")
-
-# while true; do
-# 	case "$1" in
-# 	-d ) DEV="$2"; shift 2 ;;
-# 	-- ) shift; break ;;
-# 	* ) break ;;
-# 	esac
-# done
-
-## xrandr names
-IN="LVDS1"
-VGA="VGA1"
-HDMI="HDMI1"
-
-# if [[ $DEV == "vga" ]]; then
-# 	DEV=$VGA
-# else
-# 	if [[ $DEV == "hdmi" ]]; then
-# 		DEV=$HDMI
-# 	else
-# 		DEV=""
-# 	fi
-# fi
+## store xrandr output
+xrandr="$(xrandr)"
 
 swap() {
-	local d1=$1; shift
-	local d2=$1; shift
-	xrandr --output ${d1} --off --output ${d2} --auto $* >&2
-}
-
-toggle() {
-	if (xrandr | grep "$1" | grep "+" >/dev/null); then
-		## connected and active
-		swap $1 $IN
-		return
-	else
-		if (xrandr | grep "$1" | grep " connected" >/dev/null); then
-			## connected but not active
-			swap $IN $1
-			return
-		fi
-	fi
-
-	echo "vex: $1 disconnected"
+	xrandr --output "$1" --off --output "$2" --auto && return
+	printf >&2 "vex: operation failed: %s off %s auto" "$1" "$2"
 	return 1
 }
 
-# [[ -n "$DEV" ]] && toggle "$DEV"
+toggle() {
+	## store xrandr info for the display
+	local display="$(grep -E "^$1" <<< "$xrandr")"
+	local internal="LVDS1"
 
-toggle $VGA
+	## connected and active
+	if (grep "+" <<< "$display" >/dev/null); then
+		swap "$1" "$internal" && return
+	fi
+	## connected but not active
+	if (grep " connected" <<< "$display" >/dev/null); then
+		swap "$internal" "$1" && return
+	fi
+
+	## should not happen
+	return 1
+}
+
+## generate list of external displays
+list=($(awk '/^(HDMI|VGA)[0-9]+ connected/ {print $1}' <<< "$xrandr"))
+
+## toggle first connected display in the list
+for display in ${list[@]}; do
+	toggle "$display" && break
+done

@@ -8,42 +8,40 @@
 # API Key provided by Alan@imgur.com
 apikey="b3625162d3418ac51a9ee805b1840452"
 
-function usage() {
+clip=""
+ret=0
+
+usage() {
 	cat <<EOF
-Usage: $0 <file> [<file> [...]]
-Upload images to imgur and output their new URLs to stdout. Each file's
+Usage: ${0##*/} <file> [<file> [...]]
+Upload images to imgur.com and output their new URLs to stdout. Each file's
 delete page is output to stderr between the view URLs.
 If xsel or xclip is available, the URLs are put on the X selection for
 easy pasting.
 EOF
 }
 
-# check arguments
-if [ "$1" = "-h" -o "$1" = "--help" ]; then
-	usage
-	exit 0
-elif [ $# -eq 0 ]; then
-	echo "imgur: no file specified" >&2
-	exit 2
-fi
-
-# check for curl
-type -p curl >/dev/null || {
-	echo "imgur: curl not found" >&2
-	exit 3
+err() {
+	printf >&2 "imgur: %s\n" "$@"
+	ret=$((++ret))
 }
 
-clip=""
-errors=false
+# check arguments
+if [[ $# -eq 0 ]]; then
+	err "no file specified"
+	exit $ret
+elif [[ "$1" = "-h" || "$1" = "--help" ]]; then
+	usage
+	exit $ret
+fi
 
 # main
-while [ $# -gt 0 ]; do
+while (( $# > 0 )); do
 	file="$1"
 	shift
 
-	if [ ! -f "$file" ]; then
-		echo "imgur: skipping ‘$file’: No such file" >&2
-		errors=true
+	if [[ ! -f "$file" ]]; then
+		err "skipping ‘$file’: No such file"
 		continue
 	fi
 
@@ -52,33 +50,28 @@ while [ $# -gt 0 ]; do
 	# the Squid proxy. Not sure if it's a Squid bug or what.
 	response=$(curl -F "key=$apikey" -H "Expect: " -F "image=@$file" \
 		http://imgur.com/api/upload.xml 2>/dev/null)
-	if [ $? -ne 0 ]; then
-		echo "Upload failed" >&2
-		errors=true
+
+	# handle errors
+	if (( $? != 0 )); then
+		err "upload ‘$file’ failed"
 		continue
-	elif [ $(echo $response | grep -c "<error_msg>") -gt 0 ]; then
-		echo "Error message from imgur:" >&2
-		echo $response | sed -r 's/.*<error_msg>(.*)<\/error_msg>.*/\1/' >&2
-		errors=true
+	elif [[ $(grep -cm1 "<error_msg>" <<< $response) -gt 0 ]]; then
+		err "error message from imgur:"
+		sed -r 's/.*<error_msg>(.*)<\/error_msg>.*/\1/' <<< $response >&2
 		continue
 	fi
 
 	# parse the response and output our stuff
-	url=$(echo $response | sed -r 's/.*<original_image>(.*)<\/original_image>.*/\1/')
-	deleteurl=$(echo $response | sed -r 's/.*<delete_page>(.*)<\/delete_page>.*/\1/')
-	echo "url: $url"
-	echo "del: $deleteurl" >&2
-
-	# append the URL to a string so we can put them all on the clipboard later
-	clip="$clip$url\n"
+	url="$(sed -r 's/.*<original_image>(.*)<\/original_image>.*/\1/' <<< $response)"
+	deleteurl="$(sed -r 's/.*<delete_page>(.*)<\/delete_page>.*/\1/' <<< $response)"
+	printf "url: %s\n" "$url"
+	printf >&2 "del: %s\n" "$deleteurl"
 done
 
 # put the URLs on the clipboard if we have xsel or xclip
-if [ $DISPLAY ]; then
-	{ type -p xsel >/dev/null && echo -n $clip | xsel; } \
-		|| { type -p xclip >/dev/null && echo -n $clip | xclip; }
+if [[ -n $DISPLAY ]]; then
+	{ type -p xsel >/dev/null && printf "%s" "$url" | xsel; } \
+		|| { type -p xclip >/dev/null && printf "%s" "$url" | xclip; }
 fi
 
-if $errors; then
-	exit 1
-fi
+exit $ret
