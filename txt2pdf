@@ -1,0 +1,5 @@
+#!/bin/bash
+# convert a raw text file to pdf using enscript and ghostscript
+# enscript does not support utf8, could try a2ps
+
+enscript "$1" -E -qp - | ps2pdf - "${1%.*}.pdf"
