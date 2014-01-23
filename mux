@@ -1,45 +1,35 @@
 #!/bin/bash
 #
-# mux: recompiles screen-256color with italics support. depends
-#      on $TERMINFO being set
+# mux --- recompile screen-256color with italics and xterm keys
+#
 # find "vim disp" in tmux FAQ
-# http://tmux.svn.sourceforge.net/viewvc/tmux/trunk/FAQ
+# http://sourceforge.net/p/tmux/tmux-code/ci/master/tree/FAQ
+#
+# xterm keys
+# http://thread.gmane.org/gmane.comp.terminal-emulators.tmux.user/2197
+# http://forums.vandyke.com/showthread.php?p=26580
 
-s="screen-256color"
+declare -r s="screen-256color"
+declare -r file="${TERMINFO:-$HOME/.terminfo}/$s.terminfo"
+declare -r dir="${file%/*}"
 
-ALL_OFF="$(tput sgr0)"
-BOLD="$(tput bold)"
-BLUE="${BOLD}$(tput setaf 4)"
-YELLOW="${BOLD}$(tput setaf 3)"
+# create directory
+mkdir -p "$dir"
 
-msg() {
-	printf "%s %s\n" "${BLUE}+${ALL_OFF}" "$@" >&2
-}
+# generate new terminfo entry in $dir
+tee >/dev/null <<EOF "$file"
+$s|GNU Screen with 256 colors, italics, and xterm keys,
+	initc@,
+	kDC=\\E[3;2~, kEND=\\E[1;2F, kHOM=\\E[1;2H, kIC=\\E[2;2~,
+	kLFT=\\E[1;2D, kNXT=\\E[6;2~, kPRV=\\E[5;2~, kRIT=\\E[1;2C,
+	smso=\\E[7m, rmso=\\E[27m,
+	sitm=\\E[3m, ritm=\\E[23m,
+	sgr=\\E[0%?%p6%t;1%;%?%p1%t;7%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;5%;m%?%p9%t\\016%e\\017%;,
+	use=screen-256color,
+EOF
 
-msg2() {
-	printf "%s %s!\n" "${YELLOW}!${ALL_OFF}" "$@" >&2
-}
+# clear old terminfo before invoking tic
+[[ -f "$dir/${s:0:1}/$s" ]] && rm -f "$dir/${s:0:1}/$s"
 
-if [[ -z $TERMINFO ]]; then
-	msg2 "environment variable TERMINFO not set"
-	exit 1
-fi
-
-if [[ -f "$TERMINFO/${s:0:1}/$s" ]]; then
-	msg2 "user local $s already exists"
-	msg2 "removing existing terminfo"
-	rm -rf "$TERMINFO/${s:0:1}/"
-else
-	msg2 "user local $s does not exist"
-	mkdir --parents "$TERMINFO"
-fi
-
-msg "patching ${s}..."
-infocmp "$s" | sed \
--e 's/^screen[^|]*|[^,]*,/screen-256color|screen-256color with italics support,/' \
--e 's/%?%p1%t;3%/%?%p1%t;3%/' \
--e 's/smso=[^,]*,/smso=\\E[7m,/' \
--e 's/rmso=[^,]*,/rmso=\\E[27m,/' \
--e '$s/$/ sitm=\\E[3m, ritm=\\E[23m,/' > "${TERMINFO}/${s}.terminfo"
-msg "compiling new terminfo file"
-tic "${TERMINFO}/${s}.terminfo" && msg "done!"
+# compile
+tic "$file"
